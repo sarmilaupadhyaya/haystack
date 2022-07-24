@@ -23,6 +23,7 @@ from haystack.modeling.model.adaptive_model import AdaptiveModel
 from haystack.modeling.training import Trainer, DistillationTrainer, TinyBERTDistillationTrainer
 from haystack.modeling.evaluation import Evaluator
 from haystack.modeling.utils import set_all_seeds, initialize_device_settings
+from haystack.modeling.model_card import extract_parameters, ModelCard
 
 from haystack.schema import Document, Answer, Span
 from haystack.document_stores.base import BaseDocumentStore
@@ -707,6 +708,7 @@ class FARMReader(BaseReader):
         # Note: This function was inspired by the save_to_hub function in the sentence-transformers repo (https://github.com/UKPLab/sentence-transformers/)
         # Especially for git-lfs tracking.
 
+
         token = HfFolder.get_token()
         if token is None:
             raise ValueError(
@@ -716,6 +718,9 @@ class FARMReader(BaseReader):
         repo_url = create_repo(token=token, repo_id=repo_id, private=private, repo_type=None, exist_ok=True)
 
         transformer_models = self.inferencer.model.convert_to_transformers()
+        ## model card added
+        model_details = extract_parameters(self.inferencer.model,transformer_models[0])
+        model_card = ModelCard(**model_details)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             repo = Repository(tmp_dir, clone_from=repo_url)
@@ -725,6 +730,7 @@ class FARMReader(BaseReader):
             # convert_to_transformers (above) creates one model per prediction head.
             # As the FarmReader models only have one head (QA) we go with this.
             transformer_models[0].save_pretrained(tmp_dir)
+            model_card_path = model_card.generate_model_card(os.path.join(tmp_dir, "README.md"))
 
             large_files = []
             for root, dirs, files in os.walk(tmp_dir):
